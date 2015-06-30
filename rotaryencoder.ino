@@ -1,0 +1,152 @@
+#include <Adafruit_NeoPixel.h>  //library ledstrip aansturen
+//defines
+#define LEDOUTPUT 6  //worden de kleuren door heen gestuurd
+#define SWITCH 21
+#define encoderlinks 2
+#define encoderrechts 3
+
+// NEO_KHZ800 800 KHz bitstream (most NeoPixel products w/WS2812 LEDs)
+// NEO_GRB Pixels are wired for GRB bitstream (most NeoPixel products)
+// NEO_RGB Pixels are wired for RGB bitstream (v1 FLORA pixels, not v2)
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(30,LEDOUTPUT, NEO_GRB + NEO_KHZ800);  //(nummer,pinnummer,pixeltype.)
+
+//ledlicht kleuren voor het licht
+uint32_t ochtendzon = strip.Color(255, 141, 11);  //2000 kelvin
+uint32_t middagzon = strip.Color(255, 244, 237);  //6000 kelvin
+uint32_t bewolking = strip.Color(207, 218, 255);  //10000 bewolking
+uint32_t kunstlicht = strip.Color(255, 213, 161); //4000 kelvin kunstlicht  //wordt niet gebruikt.
+uint32_t leduit      = strip.Color(0,0,0);        //led uit door switch
+
+//switch-settings
+
+//led settings rotator
+int encodeteller = 10;          // how bright the LED is, start at half encodeteller
+int verandAantal = 5;          // how many points to fade the LED by
+unsigned char encoder_A;
+unsigned char encoder_B;
+unsigned char encoder_A_prev=0;
+//switch
+volatile int switchstatus = 1;
+
+
+void setup()  
+  {   
+  
+    //sandor bakker instellingen
+    //switch instellingen
+  pinMode(SWITCH,INPUT_PULLUP);
+  digitalWrite(SWITCH, HIGH);      //pullup resistor on
+    
+    //pullup rotator instellingen
+  pinMode(encoderlinks, INPUT);   //voor links draaien
+  pinMode(encoderrechts, INPUT);  //voor rechts draaien
+
+
+  digitalWrite(encoderlinks, HIGH); //pullup resistor on
+  digitalWrite(encoderrechts, HIGH); //pullup resistor on
+
+  //roep zetkleur() wanneer er 1 verranderd.
+  //op interrupt 0 (pin 2), of interrupt 1 (pin 3) 
+  // ook interrupt voor encoder aan of uit pin(21) interrupt 2.
+  attachInterrupt(0, zetkleur, CHANGE);
+  attachInterrupt(1, zetkleur, CHANGE);
+  attachInterrupt(2, switchzet,FALLING); //change werkt niet goed, omdat hij anders direct 2x veranderd, (van laag naar hoog, en van hoog naar laag direct) dus alleen als hij van LOW -> HIGH gaat nu.
+  
+  strip.begin();
+  
+  //einde sandor bakker instellingen
+   
+  } 
+
+void loop()  
+  {
+
+  }
+
+void switchzet()
+{
+
+         if(switchstatus == 0)
+         {
+          stand(ochtendzon); //lampen op ochtendzon
+          strip.show();      //zet lampen 
+          switchstatus = 1;  //als laatste anders knipperen
+         delay(200);
+         } 
+         else
+         {
+           stand(leduit);      //zet de lampen uit
+           strip.show();       //laad de strip weten dat het uit moet alle lampjes
+           switchstatus = 0;   //als laatste anders gaat ie knipperen
+           delay(200);        
+         }
+      
+}
+  
+  void stand(uint32_t kleur)  //door sandor bakker
+  {
+     for(uint32_t i = 0 ; i < 30 ; i++)  //zet alle lichtjes 1 voor 1 aan.(alle 30);
+    {
+      strip.setPixelColor(i,kleur); 
+    }
+    
+  }
+
+  
+  void zetkleur()     //door sandor Bakker
+  {
+      if(switchstatus == 1)  // is hij ingedrukt om aan te gaan.
+      {
+        encoder_A = digitalRead(encoderlinks);    //lees encoder pinnen
+        encoder_B = digitalRead(encoderrechts);   
+        if((!encoder_A) && (encoder_A_prev))
+        {
+          // A has gone from high to low 
+          if(encoder_B) 
+          {
+            // B is high so clockwise
+            // increase the encodeteller, dont go over 255
+             encodeteller += verandAantal;               
+          }   
+          else 
+          {
+            // B is low so counter-clockwise      
+            // decrease the encodeteller, dont go below 0
+             encodeteller -= verandAantal;               
+          }   
+    
+        }   
+        encoder_A_prev = encoder_A;     // sla gegeven op A voor volgende keer.
+        if(encodeteller >= 30 && encodeteller <=35)  // kijkt welke stand de teller staat
+          {
+            stand(bewolking);  //stel de stand in welke kleur
+            strip.show();      //zet alle ledjes aan volgens de kleur.
+          }      
+        if(encodeteller >= 20 && encodeteller <=25)  // kijkt welke stand de teller staat
+          {
+            stand(middagzon);  //stel de stand in welke kleur
+            strip.show();      //zet alle ledjes aan volgens de kleur.
+       
+     
+          }  
+         if(encodeteller >= 10 && encodeteller <20) // kijkt welke stand de teller staat
+          {
+            stand(ochtendzon);  //stel de stand in welke kleur
+            strip.show();       //zet alle ledjes aan volgens de kleur.
+          }  
+         if(encodeteller > 35)  //boven een bepaalde waarde naar beginwaarde
+         {encodeteller = 10;}
+         if(encodeteller < 10)  //beneden bepaalde waarde naar beginwaarde
+          {encodeteller = 35; }
+      }
+      else
+      {
+        stand(leduit);  //voor de zekerheid, is eigenlijk al niet nodig
+        strip.show();   //zet alle ledjes.
+      }
+      
+
+  }
+                           
+
+
